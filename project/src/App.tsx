@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
 import CheckoutPage from './components/CheckoutPage';
 import EMIFlow from './components/EMIFlow';
 import Confirmation from './components/Confirmation';
 import Header from './components/Header';
+import TestPaymentFlow from './components/TestPaymentFlow';
+import UserProfile from './components/UserProfile';
 import { CheckCircle } from 'lucide-react';
+import { contractService } from './services/contractService';
 
-type AppState = 'landing' | 'checkout' | 'emi' | 'confirmation' | 'paid';
+type AppState = 'landing' | 'checkout' | 'emi' | 'confirmation' | 'paid' | 'test' | 'profile';
 
 interface OrderData {
   items: Array<{
     name: string;
     price: number;
+    quantity?: number;
   }>;
   total: number;
+  vendor: string;
+  orderId: string;
 }
 
 function App() {
@@ -21,17 +27,19 @@ function App() {
   const [selectedPlan, setSelectedPlan] = useState<any>(null);
   const [connectedWallet, setConnectedWallet] = useState<string>('');
 
-  // Mock order data
+  // Test order data - 2 PYUSD for Sepolia testing
   const orderData: OrderData = {
     items: [
-      { name: 'Premium Subscription', price: 299.99 },
-      { name: 'Additional Features', price: 49.99 }
+      { name: 'Test Product', price: 2.00, quantity: 1 }
     ],
-    total: 349.98
+    total: 2.00,
+    vendor: 'PayLater Test Store',
+    orderId: 'TEST-001'
   };
 
   const handleGetStarted = () => {
-    setCurrentState('checkout');
+    // For testing, go directly to test payment flow
+    setCurrentState('test');
   };
 
   const handlePayNow = () => {
@@ -45,9 +53,27 @@ function App() {
     setCurrentState('emi');
   };
 
-  const handleEMIConfirm = (plan: any) => {
-    setSelectedPlan(plan);
-    setCurrentState('confirmation');
+  const handleEMIConfirm = async (emiData: any) => {
+    setSelectedPlan(emiData);
+    
+    try {
+      // Create EMI plan on blockchain
+      const emiContractAddress = await contractService.createEMIPlan({
+        user: connectedWallet,
+        merchant: '0x742d35Cc6634C0532925a3b8D4C9db96C4b5Da5e', // Mock merchant address
+        totalAmount: orderData.total.toString(),
+        termMonths: emiData.plan.term,
+        interestRate: emiData.plan.interestRate * 100, // Convert to basis points
+        depositAmount: emiData.deposit.amount.toString(),
+        depositPercentage: emiData.deposit.percentage * 100 // Convert to basis points
+      });
+      
+      console.log('EMI Contract created:', emiContractAddress);
+      setCurrentState('confirmation');
+    } catch (error) {
+      console.error('Failed to create EMI plan:', error);
+      alert('Failed to create EMI plan. Please try again.');
+    }
   };
 
   const handleBackToCheckout = () => {
@@ -59,14 +85,24 @@ function App() {
     setSelectedPlan(null);
   };
 
-  const handleWalletConnect = (address: string) => {
+  const handleWalletConnect = async (address: string) => {
     setConnectedWallet(address);
     console.log('Wallet connected:', address);
+    
+    try {
+      await contractService.initialize();
+    } catch (error) {
+      console.error('Failed to initialize contract service:', error);
+    }
   };
 
   const handleWalletDisconnect = () => {
     setConnectedWallet('');
     console.log('Wallet disconnected');
+  };
+
+  const handleViewProfile = () => {
+    setCurrentState('profile');
   };
 
   if (currentState === 'paid') {
@@ -103,6 +139,36 @@ function App() {
           onWalletDisconnect={handleWalletDisconnect}
         />
         <LandingPage onGetStarted={handleGetStarted} />
+      </div>
+    );
+  }
+
+  if (currentState === 'test') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header
+          onWalletConnect={handleWalletConnect}
+          onWalletDisconnect={handleWalletDisconnect}
+          connectedWallet={connectedWallet}
+          onViewProfile={handleViewProfile}
+        />
+        <TestPaymentFlow />
+      </div>
+    );
+  }
+
+  if (currentState === 'profile') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header
+          onWalletConnect={handleWalletConnect}
+          onWalletDisconnect={handleWalletDisconnect}
+          connectedWallet={connectedWallet}
+          onViewProfile={handleViewProfile}
+        />
+        <main className="max-w-4xl mx-auto p-4">
+          <UserProfile walletAddress={connectedWallet} />
+        </main>
       </div>
     );
   }

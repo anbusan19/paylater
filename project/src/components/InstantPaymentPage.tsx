@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Wallet, CheckCircle, AlertCircle, Copy, ExternalLink } from 'lucide-react';
+import { PaymentService } from '../utils/paymentService';
 
 interface OrderData {
   items: Array<{
@@ -31,38 +32,75 @@ const InstantPaymentPage: React.FC<InstantPaymentPageProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [step, setStep] = useState<'connect' | 'confirm' | 'processing'>('connect');
 
-  // Mock wallet connection
+  // Real wallet connection
   const connectWallet = async () => {
     setIsProcessing(true);
     
-    // Simulate wallet connection delay
-    setTimeout(() => {
-      const mockAddress = '0x742d35Cc434C1234567890abcdef1234567890ab';
-      const mockBalance = 1250.50; // Mock PYUSD balance
-      
-      setWalletAddress(mockAddress);
-      setPyusdBalance(mockBalance);
-      setWalletConnected(true);
-      setStep('confirm');
+    try {
+      if (typeof window.ethereum === 'undefined') {
+        alert('MetaMask is not installed. Please install MetaMask to continue.');
+        setIsProcessing(false);
+        return;
+      }
+
+      const accounts = await window.ethereum.request({
+        method: 'eth_requestAccounts',
+      });
+
+      if (accounts.length > 0) {
+        const address = accounts[0];
+        setWalletAddress(address);
+        
+        // Verify PYUSD contract first
+        const contractCheck = await PaymentService.verifyPYUSDContract();
+        if (!contractCheck.isValid) {
+          alert(`PYUSD contract verification failed: ${contractCheck.error}`);
+        }
+        
+        // Get real PYUSD balance
+        const balance = await PaymentService.getPYUSDBalance(address);
+        setPyusdBalance(balance);
+        
+        console.log(`Wallet: ${address}`);
+        console.log(`PYUSD Balance: ${balance}`);
+        
+        setWalletConnected(true);
+        setStep('confirm');
+      }
+    } catch (error: any) {
+      console.error('Wallet connection failed:', error);
+      alert('Failed to connect wallet. Please try again.');
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
   };
 
   const processPayment = async () => {
     setStep('processing');
     setIsProcessing(true);
 
-    // Simulate payment processing
-    setTimeout(() => {
-      const mockTxHash = '0x' + Math.random().toString(16).substr(2, 64);
-      
-      if (pyusdBalance >= orderData.total) {
-        onPaymentSuccess(mockTxHash);
-      } else {
+    try {
+      // Check balance first
+      const hasBalance = await PaymentService.checkSufficientBalance(walletAddress, orderData.total);
+      if (!hasBalance) {
         onPaymentFailed('Insufficient PYUSD balance');
+        return;
       }
+
+      // Process the actual payment
+      const result = await PaymentService.processInstantPayment(walletAddress, orderData.total);
+      
+      if (result.success && result.transactionHash) {
+        onPaymentSuccess(result.transactionHash);
+      } else {
+        onPaymentFailed(result.error || 'Payment failed');
+      }
+    } catch (error: any) {
+      console.error('Payment processing failed:', error);
+      onPaymentFailed(error.message || 'Payment failed');
+    } finally {
       setIsProcessing(false);
-    }, 3000);
+    }
   };
 
   const copyToClipboard = (text: string) => {

@@ -1,0 +1,23 @@
+{
+  "name": "paylater-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for PayLater EMI system",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:local": "hardhat run scripts/deploy.js --network hardhat",
+    "test": "hardhat test",
+    "verify": "hardhat verify",
+    "node": "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@openzeppelin/contracts": "^4.9.0",
+    "hardhat": "^2.17.0",
+    "dotenv": "^16.0.0",
+    "ethers": "^5.7.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.0"
+  }
+}

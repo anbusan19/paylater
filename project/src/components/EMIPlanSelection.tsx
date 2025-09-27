@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, DollarSign } from 'lucide-react';
+import { Calendar, DollarSign, CreditCard } from 'lucide-react';
 
 interface OrderData {
   items: Array<{
@@ -9,9 +9,18 @@ interface OrderData {
   total: number;
 }
 
+interface EMIPlan {
+  id: string;
+  term: number;
+  monthlyAmount: number;
+  totalAmount: number;
+  label: string;
+  interestRate: number;
+}
+
 interface EMIPlanSelectionProps {
   orderData: OrderData;
-  onPlanSelected: (plan: any) => void;
+  onPlanSelected: (plan: EMIPlan) => void;
 }
 
 const EMIPlanSelection: React.FC<EMIPlanSelectionProps> = ({ orderData, onPlanSelected }) => {
@@ -30,27 +39,30 @@ const EMIPlanSelection: React.FC<EMIPlanSelectionProps> = ({ orderData, onPlanSe
     return monthlyPayment;
   };
 
-  const plans = [
+  const plans: EMIPlan[] = [
     {
       id: '3months',
       term: 3,
       monthlyAmount: calculateMonthlyAmount(3),
       totalAmount: calculateMonthlyAmount(3) * 3,
-      label: '3 Months'
+      label: '3 Months',
+      interestRate: 0.12
     },
     {
       id: '6months',
       term: 6,
       monthlyAmount: calculateMonthlyAmount(6),
       totalAmount: calculateMonthlyAmount(6) * 6,
-      label: '6 Months'
+      label: '6 Months',
+      interestRate: 0.12
     },
     {
       id: '12months',
       term: 12,
       monthlyAmount: calculateMonthlyAmount(12),
       totalAmount: calculateMonthlyAmount(12) * 12,
-      label: '12 Months'
+      label: '12 Months',
+      interestRate: 0.14
     }
   ];
 

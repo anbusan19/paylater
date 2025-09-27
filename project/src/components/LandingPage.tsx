@@ -248,53 +248,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-24 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl lg:text-5xl font-bold text-black mb-6">
-              Trusted by Thousands
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Join the growing community of users who've transformed their payment experience.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                quote: "PayLater transformed how I manage large purchases. The EMI options are incredibly flexible.",
-                author: "Sarah Chen",
-                role: "Product Designer"
-              },
-              {
-                quote: "The wallet creation process is seamless, and the security features give me complete peace of mind.",
-                author: "Marcus Rodriguez",
-                role: "Software Engineer"
-              },
-              {
-                quote: "Finally, a payment solution that understands modern financial needs. Highly recommended!",
-                author: "Emily Watson",
-                role: "Marketing Director"
-              }
-            ].map((testimonial, index) => (
-              <div key={index} className="bg-white p-8 rounded-3xl border border-gray-100">
-                <div className="flex items-center mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-black fill-current" />
-                  ))}
-                </div>
-                <p className="text-gray-600 mb-6 leading-relaxed">"{testimonial.quote}"</p>
-                <div>
-                  <div className="font-bold text-black">{testimonial.author}</div>
-                  <div className="text-gray-500 text-sm">{testimonial.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* CTA Section */}
       <section className="py-24 bg-black text-white relative overflow-hidden">
 

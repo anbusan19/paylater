@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, Wallet, Shield, DollarSign, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { EMIService } from '../utils/emiService';
+import { PaymentService } from '../utils/paymentService';
 
 interface OrderData {
   items: Array<{
@@ -72,26 +74,46 @@ const EMIPaymentPage: React.FC<EMIPaymentPageProps> = ({
   const connectWallet = async () => {
     setIsProcessing(true);
     
-    setTimeout(() => {
-      const mockAddress = '0x742d35Cc434C1234567890abcdef1234567890ab';
-      setWalletAddress(mockAddress);
-      setWalletConnected(true);
-      setStep('verify');
+    try {
+      if (typeof window.ethereum === 'undefined') {
+        alert('MetaMask is not installed. Please install MetaMask to continue.');
+        setIsProcessing(false);
+        return;
+      }
+
+      const accounts = await window.ethereum.request({
+        method: 'eth_requestAccounts',
+      });
+
+      if (accounts.length > 0) {
+        setWalletAddress(accounts[0]);
+        setWalletConnected(true);
+        setStep('verify');
+      }
+    } catch (error: any) {
+      console.error('Wallet connection failed:', error);
+      alert('Failed to connect wallet. Please try again.');
+    } finally {
       setIsProcessing(false);
-    }, 2000);
+    }
   };
 
   const verifyEligibility = async () => {
     setIsProcessing(true);
     
-    setTimeout(() => {
-      // Mock verification process
-      const score = Math.floor(Math.random() * 40) + 60; // Score between 60-100
-      setVerificationScore(score);
-      setIsEligible(score >= 70);
+    try {
+      const eligibility = await EMIService.verifyEligibility(walletAddress);
+      setVerificationScore(eligibility.score);
+      setIsEligible(eligibility.isEligible);
       setStep('select');
+    } catch (error) {
+      console.error('Eligibility verification failed:', error);
+      setIsEligible(false);
+      setVerificationScore(0);
+      setStep('select');
+    } finally {
       setIsProcessing(false);
-    }, 3000);
+    }
   };
 
   const confirmEMI = async () => {
@@ -100,14 +122,43 @@ const EMIPaymentPage: React.FC<EMIPaymentPageProps> = ({
     setStep('processing');
     setIsProcessing(true);
 
-    setTimeout(() => {
-      if (isEligible && selectedPlan) {
-        onEMISuccess(selectedPlan, walletAddress);
+    try {
+      // Process EMI payment (liquidity pool to merchant)
+      const result = await PaymentService.processEMIPayment(
+        walletAddress, 
+        orderData.total, 
+        selectedPlan
+      );
+
+      if (result.success) {
+        // Create EMI schedule
+        const schedule = EMIService.calculateEMIPlan(
+          orderData.total,
+          selectedPlan.term,
+          selectedPlan.interestRate
+        );
+
+        // Create EMI contract
+        const contractResult = await EMIService.createEMIContract(
+          walletAddress,
+          import.meta.env.VITE_MERCHANT_WALLET_ADDRESS || '',
+          schedule
+        );
+
+        if (contractResult.success) {
+          onEMISuccess(selectedPlan, walletAddress);
+        } else {
+          onEMIFailed(contractResult.error || 'EMI contract creation failed');
+        }
       } else {
-        onEMIFailed('EMI setup failed');
+        onEMIFailed(result.error || 'EMI payment failed');
       }
+    } catch (error: any) {
+      console.error('EMI confirmation failed:', error);
+      onEMIFailed(error.message || 'EMI setup failed');
+    } finally {
       setIsProcessing(false);
-    }, 3000);
+    }
   };
 
   if (step === 'connect') {

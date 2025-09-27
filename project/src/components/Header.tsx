@@ -4,6 +4,8 @@ import { Wallet, Zap} from 'lucide-react';
 interface HeaderProps {
   onWalletConnect?: (address: string) => void;
   onWalletDisconnect?: () => void;
+  connectedWallet?: string;
+  onViewProfile?: () => void;
 }
 
 declare global {
@@ -12,7 +14,12 @@ declare global {
   }
 }
 
-const Header: React.FC<HeaderProps> = ({ onWalletConnect, onWalletDisconnect }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  onWalletConnect, 
+  onWalletDisconnect, 
+  connectedWallet,
+  onViewProfile 
+}) => {
   const [isConnected, setIsConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
@@ -114,12 +121,15 @@ const Header: React.FC<HeaderProps> = ({ onWalletConnect, onWalletDisconnect }) 
             </button>
           ) : (
             <div className="flex items-center space-x-3">
-              <div className="bg-gray-100 py-2 px-3 rounded-xl flex items-center space-x-2">
+              <button
+                onClick={onViewProfile}
+                className="bg-gray-100 py-2 px-3 rounded-xl flex items-center space-x-2 hover:bg-gray-200 transition-colors"
+              >
                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                 <code className="text-sm text-black font-mono">
                   {formatAddress(walletAddress)}
                 </code>
-              </div>
+              </button>
               <button
                 onClick={disconnectWallet}
                 className="text-gray-500 hover:text-gray-700 transition-colors text-sm"
