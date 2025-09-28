@@ -1,6 +1,12 @@
+import { ArrowRight, Calendar, CheckCircle, CreditCard, DollarSign } from 'lucide-react';
 import React, { useState } from 'react';
-import { CheckCircle, Calendar, DollarSign, CreditCard, ArrowRight } from 'lucide-react';
-import { contractService } from '../services/contractService';
+import { PaymentService } from '../utils/paymentService';
+
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
 
 interface OrderData {
   items: Array<{
@@ -25,22 +31,34 @@ const Confirmation: React.FC<ConfirmationProps> = ({ plan, orderData, onBackHome
   const [transactionHash, setTransactionHash] = useState('');
 
   const handlePayDeposit = async () => {
-    if (!plan.emiContractAddress) {
-      alert('EMI contract not found. Please try again.');
+    if (typeof window.ethereum === 'undefined') {
+      alert('Please install MetaMask to proceed with the payment.');
       return;
     }
 
     setIsProcessing(true);
     
     try {
-      const txHash = await contractService.processDeposit(plan.emiContractAddress);
-      setTransactionHash(txHash);
-      setDepositPaid(true);
-      
-      alert('Deposit paid successfully! Your EMI plan is now active.');
-    } catch (error) {
+      // Get the current user's address
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const userAddress = accounts[0];
+
+      // Initialize payment service for the PYUSD transfer
+      const paymentResult = await PaymentService.processInstantPayment(
+        userAddress, 
+        plan.deposit.amount
+      );
+
+      if (paymentResult.success && paymentResult.transactionHash) {
+        setTransactionHash(paymentResult.transactionHash);
+        setDepositPaid(true);
+        alert('Deposit paid successfully! Your EMI plan is now active.');
+      } else {
+        throw new Error(paymentResult.error || 'Transaction failed');
+      }
+    } catch (error: any) {
       console.error('Failed to pay deposit:', error);
-      alert('Failed to pay deposit. Please try again.');
+      alert(error.message || 'Failed to pay deposit. Please try again.');
     } finally {
       setIsProcessing(false);
     }

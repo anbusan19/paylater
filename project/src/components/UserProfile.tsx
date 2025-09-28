@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  User, 
-  CreditCard, 
-  Calendar, 
-  TrendingUp, 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle,
-  DollarSign,
-  Award,
-  History
+import {
+    AlertTriangle,
+    Award,
+    CheckCircle,
+    Clock,
+    CreditCard,
+    DollarSign,
+    History,
+    TrendingUp,
+    User
 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { PaymentService, TransactionHistory } from '../utils/paymentService';
 
 interface EMIRecord {
   id: string;
@@ -64,80 +64,56 @@ const UserProfile: React.FC<UserProfileProps> = ({ walletAddress }) => {
 
   const loadUserProfile = async () => {
     setLoading(true);
-    
-    // Mock data - replace with actual contract calls
-    setTimeout(() => {
+    try {
+      const profile = await PaymentService.getUserProfile(walletAddress);
+      
       setProfileData({
-        address: walletAddress,
-        creditScore: 750,
-        totalEMIs: 8,
-        activeEMIs: 2,
-        completedEMIs: 6,
-        totalAmountFinanced: 15420.50,
-        onTimePaymentRate: 96.5,
-        joinDate: new Date('2024-01-15')
+        address: profile.address,
+        creditScore: 0, // Not implemented yet
+        totalEMIs: profile.activeEMIs + profile.completedEMIs,
+        activeEMIs: profile.activeEMIs,
+        completedEMIs: profile.completedEMIs,
+        totalAmountFinanced: profile.totalAmountFinanced,
+        onTimePaymentRate: 100, // Not implemented yet
+        joinDate: new Date()
       });
 
-      setActiveEMIs([
-        {
-          id: 'emi-001',
-          merchantName: 'TechStore Pro',
-          totalAmount: 1200.00,
-          monthlyAmount: 108.50,
-          remainingPayments: 8,
-          nextPaymentDate: new Date('2025-01-15'),
-          status: 'active',
-          depositAmount: 240.00,
-          startDate: new Date('2024-05-15')
-        },
-        {
-          id: 'emi-002',
-          merchantName: 'Fashion Hub',
-          totalAmount: 800.00,
-          monthlyAmount: 145.20,
-          remainingPayments: 3,
-          nextPaymentDate: new Date('2025-01-10'),
-          status: 'active',
-          depositAmount: 120.00,
-          startDate: new Date('2024-10-10')
-        }
-      ]);
+      // Filter and format EMI transactions
+      const emiTransactions = profile.transactions
+        .filter((tx: TransactionHistory) => tx.type === 'emi')
+        .map((tx: TransactionHistory) => ({
+          id: tx.loanId || '',
+          merchantName: tx.merchantName || `Merchant (${tx.merchantAddress.slice(0, 6)}...)`,
+          totalAmount: tx.amount,
+          monthlyAmount: tx.amount / 12, // Default to 12 months
+          remainingPayments: 0, // Will be updated from contract
+          nextPaymentDate: new Date(), // Will be updated from contract
+          status: 'active' as 'active' | 'completed' | 'overdue',
+          depositAmount: tx.amount * 0.2, // 20% deposit
+          startDate: tx.date
+        }));
+        
+      setActiveEMIs(emiTransactions);
 
-      setPaymentHistory([
-        {
-          id: 'pay-001',
-          emiId: 'emi-001',
-          merchantName: 'TechStore Pro',
-          amount: 240.00,
-          date: new Date('2024-05-15'),
-          type: 'deposit',
-          status: 'completed',
-          transactionHash: '0x1234...5678'
-        },
-        {
-          id: 'pay-002',
-          emiId: 'emi-001',
-          merchantName: 'TechStore Pro',
-          amount: 108.50,
-          date: new Date('2024-06-15'),
-          type: 'installment',
-          status: 'completed',
-          transactionHash: '0x2345...6789'
-        },
-        {
-          id: 'pay-003',
-          emiId: 'emi-002',
-          merchantName: 'Fashion Hub',
-          amount: 120.00,
-          date: new Date('2024-10-10'),
-          type: 'deposit',
-          status: 'completed',
-          transactionHash: '0x3456...7890'
-        }
-      ]);
+      // Convert blockchain transactions to payment history
+      setPaymentHistory(profile.transactions.map((tx: TransactionHistory, index: number) => ({
+        id: `pay-${index}`,
+        emiId: tx.loanId || `unknown-${index}`,
+        merchantName: tx.merchantName || `Merchant (${tx.merchantAddress.slice(0, 6)}...)`,
+        amount: tx.amount,
+        date: tx.date,
+        type: tx.type === 'emi' ? 'deposit' : 'installment',
+        status: tx.status,
+        transactionHash: tx.transactionHash
+      })));
 
       setLoading(false);
-    }, 1000);
+    } catch (error: any) {
+      console.error('Failed to load profile:', error);
+      // Show error state here if needed
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatDate = (date: Date) => {

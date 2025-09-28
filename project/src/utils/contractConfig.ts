@@ -8,11 +8,8 @@ export const CONTRACT_CONFIG = {
   LIQUIDITY_WALLET_ADDRESS: import.meta.env.VITE_LIQUIDITY_WALLET_ADDRESS || FALLBACK_LIQUIDITY_ADDRESS,
   // Using Sepolia testnet for testing
   PYUSD_CONTRACT_ADDRESS: '0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9', // PYUSD on Sepolia testnet
-  // Add your deployed contract addresses here
-  PAYMENT_CONTRACT_ADDRESS: '', // Your Payment Contract
-  EMI_MANAGER_CONTRACT_ADDRESS: '', // Your EMI Manager Contract
+  EMI_PLATFORM_ADDRESS: import.meta.env.VITE_EMI_PLATFORM_ADDRESS || '0x38a135aF64dE03F850CF9b4aE793588D182e1E10', // EMI Platform on Sepolia
   LIQUIDITY_POOL_CONTRACT_ADDRESS: '', // Your Liquidity Pool Contract
-  USER_PROFILE_CONTRACT_ADDRESS: '', // Your User Profile Contract
 };
 
 // Debug: Log environment variables

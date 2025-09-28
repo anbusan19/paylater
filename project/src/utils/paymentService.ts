@@ -1,3 +1,5 @@
+import { ethers } from 'ethers';
+import EMI_PLATFORM_ABI from '../contracts/EMIPlatform.json';
 import { CONTRACT_CONFIG, NETWORK_CONFIG } from './contractConfig';
 
 declare global {
@@ -10,6 +12,27 @@ export interface PaymentResult {
   success: boolean;
   transactionHash?: string;
   error?: string;
+}
+
+export interface TransactionHistory {
+  transactionHash: string;
+  type: 'instant' | 'emi' | 'installment';
+  amount: number;
+  date: Date;
+  status: 'completed' | 'failed';
+  merchantAddress: string;
+  merchantName?: string;
+  loanId?: string;
+}
+
+export interface UserProfile {
+  address: string;
+  balance: number;
+  totalTransactions: number;
+  activeEMIs: number;
+  completedEMIs: number;
+  totalAmountFinanced: number;
+  transactions: TransactionHistory[];
 }
 
 export class PaymentService {
@@ -150,7 +173,7 @@ export class PaymentService {
       // 2. Create EMI schedule
       // 3. Transfer from liquidity pool to merchant
       const transactionParameters = {
-        to: CONTRACT_CONFIG.EMI_MANAGER_CONTRACT_ADDRESS || CONTRACT_CONFIG.PYUSD_CONTRACT_ADDRESS,
+        to: '0x38a135aF64dE03F850CF9b4aE793588D182e1E10',
         from: userAddress,
         data: this.encodeEMISetup(merchantAddress, liquidityAddress, amountInWei, emiPlan),
         gas: '0x7A120', // Higher gas for contract interaction
@@ -201,6 +224,89 @@ export class PaymentService {
     // This would encode your custom EMI contract function
     // For now, return a basic transfer encoding
     return this.encodePYUSDTransfer(merchant, amount);
+  }
+
+  /**
+   * Get user profile including transaction history
+   */
+  static async getUserProfile(address: string): Promise<UserProfile> {
+    try {
+      const provider = await this.getWeb3Provider();
+      const balance = await this.getPYUSDBalance(address);
+
+      // Get contract instance
+      const emiContract = new ethers.Contract(
+        CONTRACT_CONFIG.EMI_PLATFORM_ADDRESS,
+        EMI_PLATFORM_ABI,
+        new ethers.providers.Web3Provider(provider)
+      );
+
+      // Get all loans created events
+      const loanFilter = emiContract.filters.LoanCreated(null, address);
+      const loanEvents = await emiContract.queryFilter(loanFilter);
+
+      // Get all payment events
+      const paymentFilter = emiContract.filters.InstallmentPaid(null, address);
+      const paymentEvents = await emiContract.queryFilter(paymentFilter);
+
+      // Process events into transaction history
+      const transactions: TransactionHistory[] = [];
+      let totalAmountFinanced = 0;
+      let activeEMIs = 0;
+      let completedEMIs = 0;
+
+      // Process loan creations
+      for (const event of loanEvents) {
+        if (!event.args) continue;
+        const loan = await emiContract.getLoan(event.args.loanId);
+        totalAmountFinanced += Number(ethers.utils.formatUnits(loan.totalAmount, 6));
+        
+        if (loan.active) {
+          activeEMIs++;
+        } else {
+          completedEMIs++;
+        }
+      }
+
+      // Process payments
+      for (const event of paymentEvents) {
+        if (!event.args || !event.transactionHash) continue;
+        
+        const eventData = {
+          transactionHash: event.transactionHash,
+          type: 'installment' as const,
+          amount: Number(ethers.utils.formatUnits(event.args.amount || 0, 6)),
+          date: new Date((event.args.nextDue?.toNumber() || Date.now() / 1000) * 1000),
+          status: 'completed' as const,
+          merchantAddress: event.args.seller || '',
+          loanId: event.args.loanId?.toString() || ''
+        };
+        transactions.push(eventData);
+      }
+
+      const userProfile: UserProfile = {
+        address,
+        balance,
+        totalTransactions: transactions.length,
+        activeEMIs,
+        completedEMIs,
+        totalAmountFinanced,
+        transactions
+      };
+
+      return userProfile;
+    } catch (error) {
+      console.error('Failed to get user profile:', error);
+      return {
+        address,
+        balance: 0,
+        totalTransactions: 0,
+        activeEMIs: 0,
+        completedEMIs: 0,
+        totalAmountFinanced: 0,
+        transactions: []
+      };
+    }
   }
 
   /**
