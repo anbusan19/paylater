@@ -1,5 +1,5 @@
+import { Calendar, CreditCard, Shield } from 'lucide-react';
 import React from 'react';
-import { CreditCard, Calendar, ArrowRight, Shield } from 'lucide-react';
 
 interface OrderData {
   items: Array<{
@@ -16,9 +16,15 @@ interface CheckoutPageProps {
   orderData: OrderData;
   onPayNow: () => void;
   onEMISelect: () => void;
+  isProcessing?: boolean;
 }
 
-const CheckoutPage: React.FC<CheckoutPageProps> = ({ orderData, onPayNow, onEMISelect }) => {
+const CheckoutPage: React.FC<CheckoutPageProps> = ({ 
+  orderData, 
+  onPayNow, 
+  onEMISelect,
+  isProcessing = false 
+}) => {
   return (
     <div className="space-y-6">
       {/* Order Summary */}
@@ -59,7 +65,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ orderData, onPayNow, onEMIS
           {/* Pay Now Option */}
           <button
             onClick={onPayNow}
-            className="w-full p-4 text-left border-2 border-gray-200 rounded-xl hover:border-black transition-colors group"
+            disabled={isProcessing}
+            className={`w-full p-4 text-left border-2 ${
+              isProcessing ? 'border-gray-100 bg-gray-50 cursor-not-allowed' : 'border-gray-200 hover:border-black'
+            } rounded-xl transition-colors group`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
@@ -81,7 +90,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ orderData, onPayNow, onEMIS
           {/* EMI Option */}
           <button
             onClick={onEMISelect}
-            className="w-full p-4 text-left border-2 border-gray-200 rounded-xl hover:border-black transition-colors group"
+            disabled={isProcessing}
+            className={`w-full p-4 text-left border-2 ${
+              isProcessing ? 'border-gray-100 bg-gray-50 cursor-not-allowed' : 'border-gray-200 hover:border-black'
+            } rounded-xl transition-colors group`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">

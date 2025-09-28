@@ -26,22 +26,34 @@ export class PaymentService {
     
     // Check if we're on Sepolia testnet
     if (chainId !== NETWORK_CONFIG.chainId) {
-      // Try to switch to Sepolia
       try {
-        await provider.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: NETWORK_CONFIG.chainId }],
-        });
-      } catch (switchError: any) {
-        // If the chain hasn't been added to MetaMask, add it
-        if (switchError.code === 4902) {
+        console.log('Switching to Sepolia network...');
+        // Try to switch to Sepolia
+        try {
           await provider.request({
-            method: 'wallet_addEthereumChain',
-            params: [NETWORK_CONFIG],
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: NETWORK_CONFIG.chainId }],
           });
-        } else {
-          throw new Error('Please switch to Sepolia testnet in MetaMask');
+        } catch (switchError: any) {
+          // If the chain hasn't been added to MetaMask, add it
+          if (switchError.code === 4902) {
+            console.log('Adding Sepolia network to MetaMask...');
+            await provider.request({
+              method: 'wallet_addEthereumChain',
+              params: [NETWORK_CONFIG],
+            });
+          } else {
+            throw switchError;
+          }
         }
+        
+        // Verify the switch was successful
+        const newChainId = await provider.request({ method: 'eth_chainId' });
+        if (newChainId !== NETWORK_CONFIG.chainId) {
+          throw new Error('Failed to switch to Sepolia network');
+        }
+      } catch (error: any) {
+        throw new Error(`Network switch failed: ${error.message || 'Please switch to Sepolia testnet in MetaMask'}`);
       }
     }
     
@@ -70,16 +82,26 @@ export class PaymentService {
       // Convert amount to Wei (USDC/PYUSD has 6 decimals)
       const amountInWei = Math.floor(amount * 1000000).toString();
 
-      // Get current gas price
-      const gasPrice = await provider.request({ method: 'eth_gasPrice' });
+      // Estimate gas for the transaction
+      const gasEstimate = await provider.request({
+        method: 'eth_estimateGas',
+        params: [{
+          to: CONTRACT_CONFIG.PYUSD_CONTRACT_ADDRESS,
+          from: userAddress,
+          data: this.encodePYUSDTransfer(merchantAddress, amountInWei)
+        }]
+      });
+
+      // Get current gas price with EIP-1559 parameters
+      const feeData = await provider.request({ method: 'eth_gasPrice' });
       
       // USDC/PYUSD transfer transaction
       const transactionParameters = {
         to: CONTRACT_CONFIG.PYUSD_CONTRACT_ADDRESS,
         from: userAddress,
         data: this.encodePYUSDTransfer(merchantAddress, amountInWei),
-        gas: '0x15F90', // 90000 in hex (higher for ERC-20 transfer)
-        gasPrice: gasPrice,
+        gas: gasEstimate,
+        maxFeePerGas: feeData,
       };
 
       const txHash = await provider.request({
@@ -191,8 +213,11 @@ export class PaymentService {
       console.log('Getting PYUSD balance for:', address);
       console.log('PYUSD Contract Address:', CONTRACT_CONFIG.PYUSD_CONTRACT_ADDRESS);
       
+      // Ensure address is properly formatted
+      const formattedAddress = address.toLowerCase();
+      
       // ERC-20 balanceOf function call
-      const data = '0x70a08231' + address.replace('0x', '').padStart(64, '0');
+      const data = '0x70a08231000000000000000000000000' + formattedAddress.replace('0x', '');
       
       const result = await provider.request({
         method: 'eth_call',
@@ -211,17 +236,10 @@ export class PaymentService {
       }
       
       // Convert from Wei to PYUSD (6 decimals)
-      const balanceWei = parseInt(result, 16);
+      const balanceWei = BigInt(result);
+      const balance = Number(balanceWei) / 1_000_000; // PYUSD uses 6 decimals
       
-      // Check if parsing was successful
-      if (isNaN(balanceWei)) {
-        console.error('Failed to parse balance result:', result);
-        return 0;
-      }
-      
-      const balance = balanceWei / 1000000;
-      
-      console.log('Balance in Wei:', balanceWei);
+      console.log('Balance in Wei:', balanceWei.toString());
       console.log('Balance in PYUSD:', balance);
       
       return balance;
